@@ -25,6 +25,10 @@ package org.acumos.onboarding.logging;
 */
 public final class OnboardingLogConstants {
 
+	
+	public static final String PARTNER_NAME = "Acumos Portal/CLI";
+	public static final String SERVICE_NAME = "/onboarding-app/v2/models";
+	
 	/**
 	 * Hide and forbid construction.
 	 */
@@ -84,6 +88,9 @@ public final class OnboardingLogConstants {
 		
 		/** MDC correlating messages for User. */
 		public static final String USER = "User";
+		
+	
+		
 
 		/**
 		 * Hide and forbid construction.
@@ -103,6 +110,10 @@ public final class OnboardingLogConstants {
 		public static final String INVOCATION_ID = "Invocation-ID";
 
 		public static final String PARTNER_NAME = "PartnerName";
+		
+		public static final String INSTANCE_ID = "InstanceUUID";
+		
+	
 
 		/**
 		 * Hide and forbid construction.
@@ -119,6 +130,11 @@ public final class OnboardingLogConstants {
 
 		/** Success. */
 		COMPLETED,
+		
+		
+		/** IN PROGRESS. */
+		INPROGRESS,
+
 
 		/** Not. */
 		ERROR,

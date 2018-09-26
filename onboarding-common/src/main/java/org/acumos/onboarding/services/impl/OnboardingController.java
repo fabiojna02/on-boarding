@@ -53,8 +53,10 @@ import org.acumos.onboarding.common.utils.OnboardingConstants;
 import org.acumos.onboarding.common.utils.UtilityFunction;
 import org.acumos.onboarding.component.docker.preparation.Metadata;
 import org.acumos.onboarding.component.docker.preparation.MetadataParser;
+import org.acumos.onboarding.logging.OnboardingLogConstants;
 import org.acumos.onboarding.services.DockerService;
 import org.json.simple.JSONObject;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -147,7 +149,6 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 			@RequestPart(required = true) MultipartFile model, @RequestPart(required = true) MultipartFile metadata,
 			@RequestPart(required = true) MultipartFile schema,
 			@RequestHeader(value = "Authorization", required = false) String authorization,
-			@RequestHeader(value = "loginName", required = false) String loginName,
 			@RequestHeader(value = "tracking_id", required = false) String trackingID,
 			@RequestHeader(value = "provider", required = false) String provider,
 			@RequestHeader(value = "shareUserName", required = false) String shareUserName,
@@ -159,6 +160,7 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 		// OnboardingNotification object that will be used to update status
 		// against that trackingID
 		OnboardingNotification onboardingStatus = null;
+		//MDC.put(OnboardingLogConstants.MDCs.USER,authorization);
 		onboardingStatus = new OnboardingNotification(cmnDataSvcEndPoinURL, cmnDataSvcUser, cmnDataSvcPwd);
 		if (trackingID != null) {
 			logger.debug(EELFLoggerDelegate.debugLogger, "Tracking ID: {}", trackingID);
@@ -178,7 +180,7 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 		logThread.set(logBean);
 		//create log file to capture logs as artifact
 		UtilityFunction.createLogFile();
-					
+		
 		logger.debug(EELFLoggerDelegate.debugLogger, "Started JWT token validation");
 		MLPUser shareUser = null;
 		Metadata mData = null;
@@ -208,28 +210,19 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 				}
 			}
 			
-			// Call to validate JWT Token.....!
-			JsonResponse<Object> valid = validate(authorization, loginName, provider);
+			
+			// Call to validate Token .....!
+			String ownerId = validate(authorization, provider);
 
-			boolean isValidToken = valid.getStatus();
-			String ownerId = null;
-		
-			if (isValidToken) {
+			if (ownerId!=null && !ownerId.isEmpty()) {
+				
 				logger.debug(EELFLoggerDelegate.debugLogger, "Token validation successful");
-				ownerId = valid.getResponseBody().toString();
-
-				if (ownerId == null) {
-					logger.error(EELFLoggerDelegate.errorLogger, "Either  username/password is invalid.");
-					throw new AcumosServiceException(AcumosServiceException.ErrorCode.OBJECT_NOT_FOUND,
-							"Either  username/password is invalid.");
-				}
-
+			
 				// update userId in onboardingStatus
 				if (onboardingStatus != null)
 					onboardingStatus.setUserId(ownerId);
 
-				logger.debug(EELFLoggerDelegate.debugLogger, "Onboarding request recieved with "
-						+ model.getOriginalFilename());
+				logger.debug(EELFLoggerDelegate.debugLogger, "Onboarding request recieved with "+ model.getOriginalFilename());
 
 				// Notify Create solution or get existing solution ID has
 				// started
@@ -415,9 +408,11 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 						if (metadataParser != null && mData != null) {
 							logger.debug(EELFLoggerDelegate.debugLogger,
 									"Adding of log artifacts into nexus started " + fileName);
+							
+							String nexusArtifactID = "onboardingLog_"+trackingID;
 
-							addArtifact(mData, file, getArtifactTypeCode(OnboardingConstants.ARTIFACT_TYPE_LOG),
-									fileName, onboardingStatus);
+							addArtifact(mData, file, getArtifactTypeCode(OnboardingConstants.ARTIFACT_TYPE_LOG),nexusArtifactID, onboardingStatus);
+							MDC.put(OnboardingLogConstants.MDCs.RESPONSE_STATUS_CODE,OnboardingLogConstants.ResponseStatus.COMPLETED.name());
 							logger.debug(EELFLoggerDelegate.debugLogger, "Artifacts log pushed to nexus successfully",
 									fileName);
 						}
@@ -427,6 +422,8 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 						logThread.unset();
 						mData = null;
 					} catch (AcumosServiceException e) {
+						MDC.put(OnboardingLogConstants.MDCs.RESPONSE_STATUS_CODE,OnboardingLogConstants.ResponseStatus.ERROR.name());
+						MDC.put(OnboardingLogConstants.MDCs.RESPONSE_DESCRIPTION,OnboardingLogConstants.ResponseStatus.ERROR.name());
 						mData = null;
 						logger.error(EELFLoggerDelegate.errorLogger, "RevertbackOnboarding Failed");
 						HttpStatus httpCode = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -436,6 +433,8 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 				}
 			} else {
 				try {
+					MDC.put(OnboardingLogConstants.MDCs.RESPONSE_STATUS_CODE,OnboardingLogConstants.ResponseStatus.ERROR.name());
+					MDC.put(OnboardingLogConstants.MDCs.RESPONSE_DESCRIPTION,"Either Username/Password is invalid.");
 					logger.error(EELFLoggerDelegate.errorLogger, "Either Username/Password is invalid.");
 					throw new AcumosServiceException(AcumosServiceException.ErrorCode.INVALID_TOKEN,
 							"Either Username/Password is invalid.");
@@ -446,6 +445,9 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 			}
 
 		} catch (AcumosServiceException e) {
+			
+			MDC.put(OnboardingLogConstants.MDCs.RESPONSE_STATUS_CODE,OnboardingLogConstants.ResponseStatus.ERROR.name());
+			MDC.put(OnboardingLogConstants.MDCs.RESPONSE_DESCRIPTION,e.getMessage());
 			HttpStatus httpCode = HttpStatus.INTERNAL_SERVER_ERROR;
 			logger.error(EELFLoggerDelegate.errorLogger, e.getErrorCode() + "  " + e.getMessage());
 			if(e.getErrorCode().equalsIgnoreCase(OnboardingConstants.INVALID_PARAMETER)) {
@@ -468,6 +470,8 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 						ServiceResponse.errorResponse("" + e.getStatusCode(), e.getMessage(),modelName), e.getStatusCode());
 			}
 		} catch (Exception e) {
+			MDC.put(OnboardingLogConstants.MDCs.RESPONSE_STATUS_CODE,OnboardingLogConstants.ResponseStatus.ERROR.name());
+			MDC.put(OnboardingLogConstants.MDCs.RESPONSE_DESCRIPTION,e.getMessage());
 			logger.error(EELFLoggerDelegate.errorLogger, e.getMessage());
 			e.printStackTrace();
 			if (e instanceof AcumosServiceException) {
