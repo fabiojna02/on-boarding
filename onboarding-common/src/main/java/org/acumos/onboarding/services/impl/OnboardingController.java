@@ -153,35 +153,42 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 			@RequestHeader(value = "provider", required = false) String provider,
 			@RequestHeader(value = "shareUserName", required = false) String shareUserName,
 	        @RequestHeader(value = "modName", required = false) String modName,
-            @RequestHeader(value = "deployment_env", required = false) Integer deployment_env)
+            @RequestHeader(value = "deployment_env", required = false) Integer deployment_env,
+            @RequestHeader(value = "Request-ID", required = false) String request_id)
 			throws AcumosServiceException {
 		
-		// If trackingID is provided in the header create a
-		// OnboardingNotification object that will be used to update status
-		// against that trackingID
+		
 		OnboardingNotification onboardingStatus = null;
-		//MDC.put(OnboardingLogConstants.MDCs.USER,authorization);
-		onboardingStatus = new OnboardingNotification(cmnDataSvcEndPoinURL, cmnDataSvcUser, cmnDataSvcPwd);
+		
 		if (trackingID != null) {
 			logger.debug(EELFLoggerDelegate.debugLogger, "Tracking ID: {}", trackingID);
-			onboardingStatus.setTrackingId(trackingID);
 		} else {
 			trackingID = UUID.randomUUID().toString();
-			onboardingStatus.setTrackingId(trackingID);
-			logger.debug(EELFLoggerDelegate.debugLogger, "Tracking ID: {}", trackingID);
+			logger.debug(EELFLoggerDelegate.debugLogger, "Tracking ID Created: {}", trackingID);
 		}
 		
-		String fileName ="onboardingLog_"+trackingID+".log";
-		//setting log filename in ThreadLocal	
+		if (request_id != null) {
+			logger.debug(EELFLoggerDelegate.debugLogger, "Request ID: {}", request_id);
+		} else {
+			request_id = UUID.randomUUID().toString();
+			logger.debug(EELFLoggerDelegate.debugLogger, "Request ID Created: {}", request_id);
+		}
+		
+		onboardingStatus = new OnboardingNotification(cmnDataSvcEndPoinURL, cmnDataSvcUser, cmnDataSvcPwd, request_id);
+		onboardingStatus.setTrackingId(trackingID);
+		onboardingStatus.setRequestId(request_id);
+		MDC.put(OnboardingLogConstants.MDCs.REQUEST_ID, request_id);
+		
+		String fileName ="OnboardingLog.txt";
 		LogBean logBean = new LogBean();
-		logBean.setLogPath(lOG_DIR_LOC);
+		logBean.setLogPath(lOG_DIR_LOC+File.separator+trackingID);
 		logBean.setFileName(fileName);
 		LogThreadLocal logThread = new LogThreadLocal();
 		logThread.set(logBean);
 		//create log file to capture logs as artifact
 		UtilityFunction.createLogFile();
 		
-		logger.debug(EELFLoggerDelegate.debugLogger, "Started JWT token validation");
+		
 		MLPUser shareUser = null;
 		Metadata mData = null;
 		String modelName = null;
@@ -402,14 +409,15 @@ public class OnboardingController extends CommonOnboarding implements DockerServ
 
 						// push docker build log into nexus
 						
-						File file = new java.io.File(OnboardingConstants.lOG_DIR_LOC + File.separator + fileName);
+						File file = new java.io.File(OnboardingConstants.lOG_DIR_LOC + File.separator + trackingID + File.separator + fileName);
 						logger.debug(EELFLoggerDelegate.debugLogger, "Log file length " + file.length(), file.getPath(),
 								fileName);
 						if (metadataParser != null && mData != null) {
 							logger.debug(EELFLoggerDelegate.debugLogger,
 									"Adding of log artifacts into nexus started " + fileName);
 							
-							String nexusArtifactID = "onboardingLog_"+trackingID;
+							//String nexusArtifactID = "onboardingLog_"+trackingID;
+							String nexusArtifactID = "OnboardingLog";
 
 							addArtifact(mData, file, getArtifactTypeCode(OnboardingConstants.ARTIFACT_TYPE_LOG),nexusArtifactID, onboardingStatus);
 							MDC.put(OnboardingLogConstants.MDCs.RESPONSE_STATUS_CODE,OnboardingLogConstants.ResponseStatus.COMPLETED.name());
