@@ -50,7 +50,9 @@ import org.acumos.onboarding.common.utils.OnboardingConstants;
 import org.acumos.onboarding.common.utils.ResourceUtils;
 import org.acumos.onboarding.component.docker.preparation.Metadata;
 import org.acumos.onboarding.component.docker.preparation.MetadataParser;
+import org.acumos.onboarding.logging.OnboardingLogConstants;
 import org.json.simple.JSONObject;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ResourceLoader;
@@ -119,7 +121,6 @@ public class CommonOnboarding {
 
 	protected ResourceUtils resourceUtils;
 	
-	protected String nexusGrpId;
 	
 	@PostConstruct
 	public void init() {
@@ -141,8 +142,6 @@ public class CommonOnboarding {
 		JsonResponse<Object> valid = null;
 		String ownerID = null, loginName = null, token = null;
 		
-		logger.debug(EELFLoggerDelegate.debugLogger,"Authorization: " + authorization);
-
 		String[] values = splitAuthorization(authorization); 
 		
 		if(values[0].toString().equalsIgnoreCase(authorization)){
@@ -153,8 +152,9 @@ public class CommonOnboarding {
 		}
 				
 		if (loginName != null && !loginName.isEmpty()) {
-
-			logger.debug(EELFLoggerDelegate.debugLogger,"Api Token validation stated");
+			
+			MDC.put(OnboardingLogConstants.MDCs.USER,loginName);
+			logger.debug(EELFLoggerDelegate.debugLogger,"Api Token validation started");
 			MLPUser mUser = cdmsClient.loginApiUser(loginName, token);
 			tokenVal = mUser.isActive();
 			ownerID = mUser.getUserId();
@@ -163,7 +163,7 @@ public class CommonOnboarding {
 
 		if (tokenVal == false) {
 
-			logger.debug(EELFLoggerDelegate.debugLogger,"JWT Token validation stated");
+			logger.debug(EELFLoggerDelegate.debugLogger,"JWT Token validation started");
 			JSONObject obj1 = new JSONObject();
 			obj1.put("jwtToken", token);
 
@@ -358,7 +358,7 @@ public class CommonOnboarding {
 		try {
 			FileInputStream fileInputStream = new FileInputStream(file);
 			int size = (int) file.length();
-			nexusGrpId=nexusGroupId+"."+metadata.getSolutionId();
+			String nexusGrpId=nexusGroupId+"."+metadata.getSolutionId();
 			UploadArtifactInfo artifactInfo = artifactClient.uploadArtifact(nexusGrpId, nexusArtifactId, metadata.getVersion(), ext, size, fileInputStream);
 			 
 			logger.debug(EELFLoggerDelegate.debugLogger,
@@ -382,7 +382,7 @@ public class CommonOnboarding {
 					logger.debug(EELFLoggerDelegate.debugLogger, "addSolutionRevisionArtifact for " + file.getName() + " successful");
 					// Notify add artifacts successful
 					if (onboardingStatus != null) {
-						onboardingStatus.setArtifactId(modelArtifact.getArtifactId());
+						//onboardingStatus.setArtifactId(modelArtifact.getArtifactId());
 						onboardingStatus.notifyOnboardingStatus("AddArtifact", "SU",
 								"Add Artifact for" + file.getName() + " Successful");
 					}
@@ -432,7 +432,7 @@ public class CommonOnboarding {
 				modelArtifact.setArtifactTypeCode(typeCode);
 				modelArtifact.setUserId(metadata.getOwnerId());
 				modelArtifact.setUri(uri);
-				modelArtifact.setSize(uri.length());
+				modelArtifact.setSize(-1);
 				modelArtifact = cdmsClient.createArtifact(modelArtifact);
 				logger.debug(EELFLoggerDelegate.debugLogger,"create Artifact - "+uri + " for solution - "+metadata.getSolutionId()+ " Successful");
 				try {
@@ -440,7 +440,7 @@ public class CommonOnboarding {
 							modelArtifact.getArtifactId());
 					logger.debug(EELFLoggerDelegate.debugLogger,"addSolutionRevisionArtifact - "+uri+" for solution - " +metadata.getSolutionId( )+" Successful");
 					if (onboardingStatus != null) {
-						onboardingStatus.setArtifactId(modelArtifact.getArtifactId());
+						//onboardingStatus.setArtifactId(modelArtifact.getArtifactId());
 						onboardingStatus.notifyOnboardingStatus("AddDockerImage","SU", "Add Artifact - "+uri + " for solution - "+metadata.getSolutionId()+ " Successful");
 					}
 					return modelArtifact;
@@ -475,12 +475,9 @@ public class CommonOnboarding {
 		logger.debug(EELFLoggerDelegate.debugLogger,"Generate TOSCA started");
 		try {
 
-			// TODO : Include toscaOutputFolder =/tmp/ and
-			// in external configuration SPRING_APPLICATION_JSON
-			// And define the variable for the same in the class.
-			
+			logger.debug(EELFLoggerDelegate.debugLogger,"nexusGroupId:" + nexusGroupId);
 			ToscaGeneratorClient client = new ToscaGeneratorClient(toscaOutputFolder, toscaGeneratorEndPointURL,
-					nexusEndPointURL, nexusUserName, nexusPassword, nexusGrpId, cmnDataSvcEndPoinURL, cmnDataSvcUser,
+					nexusEndPointURL, nexusUserName, nexusPassword, nexusGroupId, cmnDataSvcEndPoinURL, cmnDataSvcUser,
 					cmnDataSvcPwd);
 
 			String result = client.generateTOSCA(metadata.getOwnerId(), metadata.getSolutionId(), metadata.getVersion(),
@@ -523,26 +520,31 @@ public class CommonOnboarding {
 				for (MLPArtifact mlpArtifact : artifactids) {
 					String artifactId = mlpArtifact.getArtifactId();
 
-					// Delete SolutionRevisionArtifact
-					logger.debug(EELFLoggerDelegate.debugLogger,"Deleting Artifact: " + artifactId);
-					cdmsClient.dropSolutionRevisionArtifact(metadata.getSolutionId(), metadata.getRevisionId(),
-							artifactId);
-					logger.debug(EELFLoggerDelegate.debugLogger,"Successfully Deleted the SolutionRevisionArtifact");
+					if (!(mlpArtifact.getArtifactTypeCode().equals("LG"))) {
 
-					// Delete Artifact
-					cdmsClient.deleteArtifact(artifactId);
-					logger.debug(EELFLoggerDelegate.debugLogger,"Successfully Deleted the Artifact");
+						// Delete SolutionRevisionArtifact
+						logger.debug(EELFLoggerDelegate.debugLogger, "Deleting Artifact: " + artifactId);
+						cdmsClient.dropSolutionRevisionArtifact(metadata.getSolutionId(), metadata.getRevisionId(),
+								artifactId);
+						logger.debug(EELFLoggerDelegate.debugLogger,
+								"Successfully Deleted the SolutionRevisionArtifact");
 
-					// Delete the file from the Nexus
-					if (!(mlpArtifact.getArtifactTypeCode().equals("DI"))) {
-						nexusClient.deleteArtifact(mlpArtifact.getUri());
-						logger.debug(EELFLoggerDelegate.debugLogger,"Successfully Deleted the Artifact from Nexus");
+						// Delete Artifact
+						cdmsClient.deleteArtifact(artifactId);
+						logger.debug(EELFLoggerDelegate.debugLogger, "Successfully Deleted the Artifact");
+
+						// Delete the file from the Nexus
+						if (!(mlpArtifact.getArtifactTypeCode().equals("DI"))) {
+							nexusClient.deleteArtifact(mlpArtifact.getUri());
+							logger.debug(EELFLoggerDelegate.debugLogger,
+									"Successfully Deleted the Artifact from Nexus");
+						}
 					}
 				}
 
 				// Delete current revision
-				cdmsClient.deleteSolutionRevision(metadata.getSolutionId(), metadata.getRevisionId());
-				logger.debug(EELFLoggerDelegate.debugLogger,"Successfully Deleted the Solution Revision");
+				/*cdmsClient.deleteSolutionRevision(metadata.getSolutionId(), metadata.getRevisionId());
+				logger.debug(EELFLoggerDelegate.debugLogger,"Successfully Deleted the Solution Revision");*/
 
 			}
 		} catch (Exception e) {
