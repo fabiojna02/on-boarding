@@ -23,5 +23,10 @@ On-Boarding
 .. toctree::
        :maxdepth: 1
 
-       developer-guide
        release-notes
+       developer-guide
+       user-guide
+       api-docs.rst
+       onboarding-ONNX-guide.rst
+       onboarding-pre_dockerised_and_URI_guide.rst
+

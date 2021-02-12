@@ -8,9 +8,9 @@
  * under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  * This file is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -19,11 +19,16 @@
  */
 package org.acumos.onboarding.common.models;
 
+import java.time.Instant;
 import java.util.Date;
 
 import org.acumos.cds.client.CommonDataServiceRestClientImpl;
-import org.acumos.cds.domain.MLPStepResult;
-import org.acumos.onboarding.common.utils.EELFLoggerDelegate;
+import org.acumos.cds.domain.MLPTask;
+import org.acumos.cds.domain.MLPTaskStepResult;
+import org.acumos.onboarding.common.utils.LogBean;
+import org.acumos.onboarding.common.utils.LoggerDelegate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -45,6 +50,8 @@ public class OnboardingNotification {
 	private Date startDate;
 	private Date endDate;
 	private String requestId;
+	private Long taskId;
+	private MLPTask task;
 
 	public String getRequestId() {
 		return requestId;
@@ -55,53 +62,74 @@ public class OnboardingNotification {
 	}
 
 	private CommonDataServiceRestClientImpl cdmsClient;
-	private static EELFLoggerDelegate logger = EELFLoggerDelegate.getLogger(OnboardingNotification.class);
-
+	private static Logger log = LoggerFactory.getLogger(OnboardingNotification.class);
+    LoggerDelegate logger = new LoggerDelegate(log);
+    
 	public OnboardingNotification(String cmnDataSvcEndPoinURL, String cmnDataSvcUser, String cmnDataSvcPwd) {
 
 		cdmsClient = new CommonDataServiceRestClientImpl(cmnDataSvcEndPoinURL, cmnDataSvcUser, cmnDataSvcPwd,null);
+		task = new MLPTask();
 	}
-	
+
 	public OnboardingNotification(String cmnDataSvcEndPoinURL, String cmnDataSvcUser, String cmnDataSvcPwd, String requestId) {
 
 		cdmsClient = new CommonDataServiceRestClientImpl(cmnDataSvcEndPoinURL, cmnDataSvcUser, cmnDataSvcPwd,null);
 		cdmsClient.setRequestId(requestId);
+		task = new MLPTask();
 	}
 
 	// current step, status and description sent to be logged.
-	public void notifyOnboardingStatus(String currentstep, String currentStatus, String currentDescription) {
-		logger.debug(EELFLoggerDelegate.debugLogger,"Notify" + currentDescription);
-		if (trackingId != null) {
+	public void notifyOnboardingStatus(String currentstep, String currentStatus, String currentDescription) throws Exception{
+		logger.debug("Notify " + currentDescription);
 
-			String desc;
-			MLPStepResult stepResult = new MLPStepResult();
+		try {
+			if (trackingId != null) {
 
-			
-			stepResult.setArtifactId(this.artifactId);
-			stepResult.setUserId(this.userId);
-			stepResult.setStatusCode(currentStatus);
-			stepResult.setTrackingId(this.trackingId);
-			stepResult.setName(currentstep);
-			stepResult.setStartDate(new Date());
-			stepResult.setEndDate(new Date());
-			stepResult.setStepCode("OB");
-			
+				String desc;
 
-			if (currentDescription != null && !currentDescription.isEmpty()) {
-				desc = currentDescription.substring(0, Math.min(currentDescription.length(), 8000));
-				stepResult.setResult(desc);
+				MLPTaskStepResult taskResult = new MLPTaskStepResult();
+
+				taskResult.setTaskId(getTaskId());
+				taskResult.setStartDate(Instant.now());
+				taskResult.setEndDate(Instant.now());
+				taskResult.setStatusCode(currentStatus);
+				taskResult.setName(currentstep);
+
+				if (currentDescription != null && !currentDescription.isEmpty()) {
+					desc = currentDescription.substring(0, Math.min(currentDescription.length(), 8000));
+					taskResult.setResult(desc);
+				}
+				logger.debug("Step: " + currentstep + " with Status: " + currentStatus);
+
+				logger.debug("Sending Notification for Task: " + getTaskId() + " with Description: " + currentDescription);
+				cdmsClient.createTaskStepResult(taskResult);
 			}
-			if (this.solutionId != null && !this.solutionId.isEmpty()) {
-				stepResult.setSolutionId(this.solutionId);
-			}
-			if (this.revisionId != null && !this.revisionId.isEmpty()) {
-				stepResult.setRevisionId(this.revisionId);
-			}
-			cdmsClient.createStepResult(stepResult);
+		} catch (Exception e) {
+			logger.error("Failed to Notify");
 		}
-		logger.debug(EELFLoggerDelegate.debugLogger,"Send Notification to DB Ended");
 	}
+	
+	public void notifyOnboardingStatus(String currentstep, String currentStatus, String currentDescription,
+			LogBean logBean) {
+		try {
+			logger.debug("Notify " + currentDescription, logBean);
+			notifyOnboardingStatus(currentstep, currentStatus, currentDescription);
+			logger.debug("Step: " + currentstep + " with Status: " + currentStatus, logBean);
+			logger.debug("Sending Notification for Task: " + getTaskId() + " with Description: " + currentDescription, logBean);
+		}catch (Exception e) {
+			logger.error("Failed to Notify");
+		}
+	}
+
 	// Get/Set methods ------
+
+	public Long getTaskId() {
+		return taskId;
+	}
+
+	public void setTaskId(Long taskId) {
+		this.taskId = taskId;
+	}
 
 	public Long getStepResultId() {
 		return stepResultId;
@@ -109,6 +137,7 @@ public class OnboardingNotification {
 
 	public void setStepResultId(Long stepResultId) {
 		this.stepResultId = stepResultId;
+
 	}
 
 	public String getTrackingId() {

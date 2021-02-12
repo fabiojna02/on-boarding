@@ -8,9 +8,9 @@
  * under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  * This file is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -35,8 +35,14 @@ public interface DockerService {
 	public ResponseEntity<ServiceResponse> OnboardingWithAuthentication(JsonRequest<Crediantials> crediantials,
 			HttpServletResponse response) throws AcumosServiceException;
 
-	public ResponseEntity<ServiceResponse> onboardModel(HttpServletRequest request, MultipartFile model,
-			MultipartFile metadata, MultipartFile schema, String authorization, String trackingID, String provider,
-			String shareUserName, String modName, Integer deployment_env , String request_id) throws AcumosServiceException;
-	
+	ResponseEntity<ServiceResponse> onboardModel(HttpServletRequest request, MultipartFile model,
+			MultipartFile metadata, MultipartFile schema, MultipartFile license,MultipartFile rdata, String authorization,
+			boolean isCreateMicroservice, String trackingID, String provider, String shareUserName, String modName,
+			Integer deployment_env, String request_id) throws AcumosServiceException;
+
+	ResponseEntity<ServiceResponse> advancedModelOnboard(HttpServletRequest request, MultipartFile model,
+			MultipartFile license,MultipartFile protobuf, String modName, String authorization, boolean isCreateMicroservice,
+			String dockerfileURL, String provider, String trackingID, String request_id, String shareUserName)
+					throws AcumosServiceException;
+
 }

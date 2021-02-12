@@ -8,9 +8,9 @@
  * under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *  
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ * 
  * This file is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -25,9 +25,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import org.acumos.onboarding.common.exception.AcumosServiceException;
-import org.acumos.onboarding.common.utils.EELFLoggerDelegate;
+import org.acumos.onboarding.common.utils.LoggerDelegate;
 import org.acumos.onboarding.common.utils.UtilityFunction;
 import org.acumos.onboarding.services.impl.OnboardingController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -43,16 +45,18 @@ public class MetadataParser {
 
 	private JsonNode metadataJson;
 
-	private static EELFLoggerDelegate logger = EELFLoggerDelegate.getLogger(OnboardingController.class);
-
+	private static Logger log = LoggerFactory.getLogger(OnboardingController.class);
+	LoggerDelegate logger = new LoggerDelegate(log);
+	
 	public MetadataParser(File dataFile) throws AcumosServiceException {
 		try {
 
+			logger.debug("::Parsing of metadata file started::");
 			String schemafile = null;
 
 			this.metadataJson = JsonLoader.fromFile(dataFile);
 			String schemaVersion = metadataJson.get("schema").asText();
-			System.out.println("schemaVersion: " + schemaVersion);
+			logger.debug("schemaVersion: " + schemaVersion);
 
 			if (schemaVersion.contains("1")) {
 				schemafile = "/model-schema-0.1.0.json";
@@ -64,6 +68,8 @@ public class MetadataParser {
 				schemafile = "/model-schema-0.4.0.json";
 			} else if (schemaVersion.contains("5")) {
 				schemafile = "/model-schema-0.5.0.json";
+			} else if (schemaVersion.contains("6")) {
+				schemafile = "/model-schema-0.6.0.json";
 			}
 
 			final JsonNode schema = JsonLoader.fromResource(schemafile);
@@ -73,7 +79,7 @@ public class MetadataParser {
 			ProcessingReport report = validator.validate(schema, this.metadataJson);
 
 			if (!report.isSuccess()) {
-				logger.debug(EELFLoggerDelegate.debugLogger,report.toString());
+				logger.debug(report.toString());
 				StringBuilder sb = new StringBuilder();
 				for (ProcessingMessage processingMessage : report) {
 					if (!processingMessage.getMessage()
@@ -100,12 +106,12 @@ public class MetadataParser {
 
 			// validating Model-Name
 			if (!modelName.matches("^[a-zA-Z0-9_-]*$")) {
-				logger.debug(EELFLoggerDelegate.debugLogger,"Invalid Model name [Metadata Parsing]:"+modelName);
+				logger.debug("Invalid Model name [Metadata Parsing]:"+modelName);
 				throw new AcumosServiceException(AcumosServiceException.ErrorCode.INVALID_PARAMETER,
 						"Invalid Model Name - " + modelName);
 			}
-			
-			logger.debug(EELFLoggerDelegate.debugLogger,"Model name [Metadata Parsing]:"+modelName);
+
+			logger.debug("Model name [Metadata Parsing]:"+modelName);
 
 			int modelNameLength = modelName.length();
 			if (modelNameLength <= 100) {
@@ -114,20 +120,18 @@ public class MetadataParser {
 				String newModelName = modelName.substring(0,
 						Math.min(modelNameLength, 100));
 				metadata.setModelName(newModelName);
-				logger.warn(EELFLoggerDelegate.debugLogger,
-                        "[Metadata Parsing] Modified Model name {} due to length more than 100 char : {}",newModelName ,modelNameLength);
+				logger.warn("[Metadata Parsing] Modified Model name " +newModelName+" due to length more than 100 char : " + modelNameLength);
 			}
-			
 
 			if (metadataJson.hasNonNull("modelVersion"))
 				metadata.setVersion(metadataJson.get("modelVersion").asText());
-			
+
 			String runtimeName;
 			JsonNode requirementsNode = null;
 			JsonNode runtimeNode = metadataJson.get("runtime");
-			
+
 			if(runtimeNode.isArray()){
-				
+
 				for(JsonNode trav : runtimeNode){
 					runtimeName = trav.get("name").asText().toLowerCase();
 					metadata.setRuntimeName(runtimeName);
@@ -148,6 +152,11 @@ public class MetadataParser {
 						requirementsNode = trav.get("dependencies").get("java").get("requirements");
 					} else if (("javageneric").equals(runtimeName)) {
 						requirementsNode = trav.get("dependencies").get("java").get("requirements");
+					} else if (("javaspark").equals(runtimeName)) {
+						requirementsNode = trav.get("dependencies").get("java").get("requirements");
+					} else if (("c++").equals(runtimeName)) {
+						requirementsNode = trav.get("dependencies").get("pip").get("requirements");
+						metadata.setExecutable(trav.get("executable").asText());
 					}
 				}
 			}
@@ -155,6 +164,7 @@ public class MetadataParser {
 				runtimeName = runtimeNode.get("name").asText().toLowerCase();
 				metadata.setRuntimeName(runtimeName);
 				metadata.setRuntimeVersion(runtimeNode.get("version").asText());
+	
 
 				if (metadataJson.hasNonNull("toolkit"))
 					metadata.setToolkit(runtimeNode.get("toolkit").asText().toLowerCase());
@@ -171,7 +181,12 @@ public class MetadataParser {
 					requirementsNode = runtimeNode.get("dependencies").get("java").get("requirements");
 				} else if (("javageneric").equals(runtimeName)) {
 					requirementsNode = runtimeNode.get("dependencies").get("java").get("requirements");
-				}
+				}  else if (("javaspark").equals(runtimeName)) {
+					requirementsNode = runtimeNode.get("dependencies").get("java").get("requirements");
+				} else if (("c++").equals(runtimeName)) {
+					requirementsNode = runtimeNode.get("dependencies").get("pip").get("requirements");
+					metadata.setExecutable(runtimeNode.get("executable").asText());
+				} 
 			}
 
 			if (requirementsNode != null) {

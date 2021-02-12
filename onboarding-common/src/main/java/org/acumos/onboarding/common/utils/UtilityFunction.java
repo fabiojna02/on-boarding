@@ -8,9 +8,9 @@
  * under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  * This file is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -23,6 +23,7 @@ package org.acumos.onboarding.common.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,9 +41,14 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import org.acumos.onboarding.common.exception.AcumosServiceException;
+import org.acumos.onboarding.services.impl.CommonOnboarding;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.utils.IOUtils;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 
 import com.github.dockerjava.api.DockerClient;
@@ -51,7 +57,19 @@ import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.DockerClientConfig;
 
 public class UtilityFunction {
-	private static final EELFLoggerDelegate logger = EELFLoggerDelegate.getLogger(UtilityFunction.class);
+	private static final Logger log = LoggerFactory.getLogger(UtilityFunction.class);
+	static LoggerDelegate logger = new LoggerDelegate(log);
+
+	private static String version = null;
+    private static String projectVersion = null;
+
+	public static String getProjectVersion() {
+		return projectVersion;
+	}
+
+	public static void setProjectVersion(String projectVersion) {
+		UtilityFunction.projectVersion = projectVersion;
+	}
 
 	public static String getGUID() {
 		return java.util.UUID.randomUUID().toString();
@@ -125,7 +143,7 @@ public class UtilityFunction {
 			}
 			boolean deleteFlag = fileStreamPath.delete();
 			//info as log file is deleted, in debug we are calling addLog()
-			logger.info("File Deleted Status = {}", deleteFlag);
+			logger.info("File Deleted Status = " + deleteFlag);
 		}
 	}
 
@@ -141,7 +159,7 @@ public class UtilityFunction {
 			}
 			return result.toString();
 		} catch (NoSuchAlgorithmException e) {
-			logger.error(EELFLoggerDelegate.errorLogger,e.getMessage(), e);
+			logger.error(e.getMessage(), e);
 			return data;
 		}
 	}
@@ -177,7 +195,7 @@ public class UtilityFunction {
 					out.write(buffer, 0, bytesRead);
 				}
 			} catch (IOException e) {
-				logger.error(EELFLoggerDelegate.errorLogger, "Fail to download {}", destFile.getName());
+				logger.error("Fail to download " + destFile.getName());
 				throw new AcumosServiceException(AcumosServiceException.ErrorCode.INTERNAL_SERVER_ERROR,
 						"Fail to download " + destFile.getName());
 			} finally {
@@ -195,7 +213,7 @@ public class UtilityFunction {
 			byte[] bytes = new byte[in.available()];
 			int count = 0;
 			count = in.read(bytes);
-			logger.debug(EELFLoggerDelegate.debugLogger,"Count is= {}", count);
+			logger.debug("Count is = " + count);
 			return bytes;
 		} finally {
 			in.close();
@@ -253,16 +271,16 @@ public class UtilityFunction {
 			byte[] bytes = new byte[in.available()];
 			int count = 0;
 			count = in.read(bytes);
-			logger.debug(EELFLoggerDelegate.debugLogger,"Count is= {}", count);
+			logger.debug("Count is = " + count);
 			return bytes;
 		} finally {
 			in.close();
 		}
 	}
-	
+
 	public static void createLogFile() {
 		LogBean logBean = LogThreadLocal.get();
-		String fileName = logBean.getFileName();
+ 		String fileName = logBean.getFileName();
 
 		File file = new java.io.File(logBean.getLogPath());
 		file.mkdirs();
@@ -271,15 +289,14 @@ public class UtilityFunction {
 			if (!f1.exists()) {
 				f1.createNewFile();
 			}
-			logger.debug(EELFLoggerDelegate.debugLogger,
-					"Log file created successfully " + f1.getAbsolutePath());
+			logger.debug("Log file created successfully " + f1.getAbsolutePath());
 		} catch (Exception e) {
 			//info to avoid infinite loop.logger.debug call again calls addlog method
 			logger.info("Failed while creating log file " + e.getMessage());
 		}
 
 	}
-	
+
 	public static void addLogs(String msg, String logType) {
 		try {
 			LogBean logBean = LogThreadLocal.get();
@@ -293,24 +310,91 @@ public class UtilityFunction {
 							+ msg + "\n");
 					fout.close();
 				}
-			} 
+			}
 		} catch (IOException e) {
 			//info to avoid infinite loop.logger.debug call again calls addlog method
 			logger.info("Exception occured while adding logs in log file" + e.getMessage());
 		}
-	} 
-	
+	}
+
+	public static void addLogs(String msg, String logType, LogBean logBean) {
+		try {
+				if (logBean != null) {
+				String fileName = logBean.getFileName();
+				String logPath = logBean.getLogPath();
+				File file = new java.io.File(logPath);
+				if (file.isDirectory()) {
+					FileWriter fout = new FileWriter(file.getPath() + File.separator + fileName, true);
+					fout.write(new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date()) + "  " + logType + "  "
+							+ msg + "\n");
+					fout.close();
+				}
+			}
+		} catch (IOException e) {
+			//info to avoid infinite loop.logger.debug call again calls addlog method
+			logger.info("Exception occured while adding logs in log file" + e.getMessage());
+		}
+	}
+
 	public static DockerClientConfig createDockerClientConfig(String host) {
-		logger.debug(EELFLoggerDelegate.debugLogger, "Inside createDockerClientConfig");
+		logger.debug("Inside createDockerClientConfig");
 		return DefaultDockerClientConfig.createDefaultConfigBuilder().withDockerHost(host).withDockerTlsVerify(false).build();
 	}
-	
+
 	public static DockerClient createDockerClient (String host) {
-		logger.debug(EELFLoggerDelegate.debugLogger, "Inside createDockerClient");
+		logger.debug("Inside createDockerClient");
 		DockerClientConfig dockerClientConfig = createDockerClientConfig(host);
 		DockerClient dockerClient = DockerClientBuilder.getInstance(dockerClientConfig).build();
-		logger.debug(EELFLoggerDelegate.debugLogger, "createDockerClient ended");
+		logger.debug("createDockerClient ended");
 		return dockerClient;
-		
+
+	}
+
+	/**
+	 * This method retrieves the current project version from pom.xml.
+	 * @return
+	 */
+	public static String getCurrentVersion() {
+
+		if (version == null) {
+			logger.info("Retrieving project version :::");
+			MavenXpp3Reader reader = new MavenXpp3Reader();
+			Model model;
+			try {
+				model = reader.read(new FileReader("pom.xml"));
+				version = model.getVersion();
+			} catch (Exception e) {
+				logger.error("getCurrentVersion Failed Exception " + e.getMessage(), e);
+			}
+		}
+		logger.debug("Onboarding version:::" + version);
+	  return version;
+	}
+
+	public static void moveFile(File srcFile, File outputFolder) throws AcumosServiceException {
+
+		try {
+			String fileName = srcFile.getName();
+			String fileExt = CommonOnboarding.getExtensionOfFile(srcFile.getName());
+
+			if (fileExt.equalsIgnoreCase("json") && !(fileName.toLowerCase().contains("license"))) {
+				logger.debug("moving file "+ srcFile.getName() +" from path :"+ srcFile.getAbsolutePath() + " to " + outputFolder.getAbsolutePath());
+				srcFile.renameTo(new File(outputFolder.getAbsolutePath() + File.separator+"metadata.json"));
+			} else if (fileExt.equalsIgnoreCase("proto") || fileExt.equalsIgnoreCase("zip")) {
+				logger.debug("moving file "+ srcFile.getName() +" from path :"+ srcFile.getAbsolutePath() + " to " + outputFolder.getAbsolutePath());
+				srcFile.renameTo(new File(outputFolder.getAbsolutePath() + File.separator+"model." + fileExt));
+			}
+		} catch (Exception e) {
+			throw new AcumosServiceException(AcumosServiceException.ErrorCode.INTERNAL_SERVER_ERROR,
+					"Fail to move file " + srcFile.getName() + " form folder cause: ", e);
+		}
+	}
+	
+	public static boolean isEmptyOrNullString(String input) {
+		boolean isEmpty = false;
+		if (null == input || 0 == input.trim().length()) {
+			isEmpty = true;
+		}
+		return isEmpty;
 	}
 }

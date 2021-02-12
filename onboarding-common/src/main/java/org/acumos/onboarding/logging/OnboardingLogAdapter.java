@@ -8,9 +8,9 @@
  * under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *  
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ * 
  * This file is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -37,9 +37,9 @@ import org.slf4j.event.Level;
 */
 public class OnboardingLogAdapter {
 
-	/** String constant for messages <tt>ENTERING</tt>, <tt>EXITING</tt>, etc. */
+	/** String constant for messages <code>ENTERING</code>, <code>EXITING</code>, etc. */
 	private static final String EMPTY_MESSAGE = "";
-	
+
 	private static final String instanceID = UUID.randomUUID().toString();
 	private static final String SUCCESS = "Success";
 
@@ -72,7 +72,7 @@ public class OnboardingLogAdapter {
 	}
 
 	/**
-	 * Report <tt>ENTERING</tt> marker.
+	 * Report <code>ENTERING</code> marker.
 	 *
 	 * @param request
 	 *            non-null incoming request (wrapper).
@@ -92,7 +92,7 @@ public class OnboardingLogAdapter {
 	}
 
 	/**
-	 * Report <tt>ENTERING</tt> marker.
+	 * Report <code>ENTERING</code> marker.
 	 *
 	 * @param request
 	 *            non-null incoming request.
@@ -107,19 +107,19 @@ public class OnboardingLogAdapter {
 	}
 
 	/**
-	 * Report <tt>EXITING</tt> marker.
+	 * Report <code>EXITING</code> marker.
 	 *
 	 * @return this.
 	 */
 	public OnboardingLogAdapter exiting() {
-		
+
 		MDC.clear();
 		return this;
-	}	
+	}
 
 	/**
 	 * Get descriptor, for setting response details.
-	 * 
+	 *
 	 * @return non-null descriptor.
 	 */
 	public ResponseDescriptor getResponseDescriptor() {
@@ -128,7 +128,7 @@ public class OnboardingLogAdapter {
 
 	/**
 	 * Override {@link ResponseDescriptor}.
-	 * 
+	 *
 	 * @param d
 	 *            non-null override.
 	 * @return this.
@@ -154,29 +154,32 @@ public class OnboardingLogAdapter {
 		final String requestID = defaultToUUID(request.getHeader(OnboardingLogConstants.Headers.REQUEST_ID));
 		final String invocationID = defaultToUUID(request.getHeader(OnboardingLogConstants.Headers.INVOCATION_ID));
 		final String partnerName = defaultToEmpty(request.getHeader(OnboardingLogConstants.Headers.PARTNER_NAME));
-		
+
 		//final String instanceID = defaultToUUID(request.getHeader(OnboardingLogConstants.Headers.INSTANCE_ID));
-		
+
 		// Get the UserName
 		final String userName = defaultToEmpty(request.getUser());
 		MDC.put(OnboardingLogConstants.MDCs.USER,userName);
-	
+
 		// Set standard MDCs. 
-		MDC.put(OnboardingLogConstants.MDCs.INVOKE_TIMESTAMP,
-				ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT));
+		/*
+		 * MDC.put(OnboardingLogConstants.MDCs.INVOKE_TIMESTAMP,
+		 * ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT));
+		 */
 		MDC.put(OnboardingLogConstants.MDCs.REQUEST_ID, requestID);
-		MDC.put(OnboardingLogConstants.MDCs.INVOCATION_ID, invocationID);
+		//MDC.put(OnboardingLogConstants.MDCs.INVOCATION_ID, invocationID);
 		//if (!partnerName.isEmpty())
-		MDC.put(OnboardingLogConstants.MDCs.PARTNER_NAME, OnboardingLogConstants.PARTNER_NAME);
+		//MDC.put(OnboardingLogConstants.MDCs.PARTNER_NAME, OnboardingLogConstants.PARTNER_NAME);
 		MDC.put(OnboardingLogConstants.MDCs.CLIENT_IP_ADDRESS, defaultToEmpty(request.getClientAddress()));
-		MDC.put(OnboardingLogConstants.MDCs.SERVER_FQDN, defaultToEmpty(request.getServerAddress()));	
-		
+		MDC.put(OnboardingLogConstants.MDCs.SERVER_FQDN, defaultToEmpty(request.getServerAddress()));
+
 		MDC.put(OnboardingLogConstants.MDCs.RESPONSE_STATUS_CODE,OnboardingLogConstants.ResponseStatus.INPROGRESS.name());
 		MDC.put(OnboardingLogConstants.MDCs.SERVICE_NAME,OnboardingLogConstants.SERVICE_NAME);
-		MDC.put(OnboardingLogConstants.MDCs.INSTANCE_UUID,instanceID);
-		MDC.put(OnboardingLogConstants.MDCs.RESPONSE_CODE,SUCCESS);
-		MDC.put(OnboardingLogConstants.MDCs.RESPONSE_DESCRIPTION,SUCCESS);
-		
+		MDC.put(OnboardingLogConstants.MDCs.RESPONSE_SEVERITY, "DEBUG");
+		//MDC.put(OnboardingLogConstants.MDCs.INSTANCE_UUID,instanceID);
+		//MDC.put(OnboardingLogConstants.MDCs.RESPONSE_CODE,SUCCESS);
+		//MDC.put(OnboardingLogConstants.MDCs.RESPONSE_DESCRIPTION,SUCCESS);
+
 		return this;
 	}
 
@@ -223,11 +226,11 @@ public class OnboardingLogAdapter {
 		}
 		return in;
 	}
-	
+
 	/**
 	 * Response is different in that response MDCs are normally only reported once,
 	 * for a single log message. (But there's no method for clearing them, because
-	 * this is only expected to be called during <tt>#exiting</tt>.)
+	 * this is only expected to be called during <code>#exiting</code>.)
 	 */
 	public static class ResponseDescriptor {
 
@@ -240,7 +243,7 @@ public class OnboardingLogAdapter {
 		/** Response severity. */
 		protected Level mSeverity;
 
-		/** Response status, of {<tt>COMPLETED</tt>, <tt>ERROR</tt>}. */
+		/** Response status, of {<code>COMPLETED</code>, <code>ERROR</code>}. */
 		protected OnboardingLogConstants.ResponseStatus mStatus;
 
 		/**
@@ -314,7 +317,7 @@ public class OnboardingLogAdapter {
 	 * Adapter for reading information from an incoming HTTP request.
 	 *
 	 * Incoming is generally easy, because in most cases you'll be able to get your
-	 * hands on the <tt>HttpServletRequest</tt>.
+	 * hands on the <code>HttpServletRequest</code>.
 	 *
 	 * Perhaps should be generalized to refer to constants instead of requiring the
 	 * implementation of specific methods.
@@ -326,7 +329,7 @@ public class OnboardingLogAdapter {
 
 		/**
 		 * Get header by name.
-		 * 
+		 *
 		 * @param name
 		 *            header name.
 		 * @return header value, or null.
@@ -335,34 +338,34 @@ public class OnboardingLogAdapter {
 
 		/**
 		 * Get client address.
-		 * 
+		 *
 		 * @return address, if available.
 		 */
 		String getClientAddress();
 
 		/**
 		 * Get server address.
-		 * 
+		 *
 		 * @return address, if available.
 		 */
 		String getServerAddress();
 
 		/**
 		 * Get default service name, from service URI.
-		 * 
+		 *
 		 * @return service name default.
 		 */
 		String getRequestURI();
-		
+
 		/**
 		 * Get UserName
-		 * 
+		 *
 		 * @return service name default.
 		 */
 		Object getUser();
 	}
 
-	
+
 	public static class HttpServletRequestAdapter implements RequestAdapter<HttpServletRequestAdapter> {
 
 		/** Wrapped HTTP request. */
@@ -370,7 +373,7 @@ public class OnboardingLogAdapter {
 
 		/**
 		 * Construct adapter for HTTP request.
-		 * 
+		 *
 		 * @param request
 		 *            to be wrapped;
 		 */
@@ -413,6 +416,6 @@ public class OnboardingLogAdapter {
 		@Override
 		public Object getUser() {
 			return this.mRequest.getAttribute(OnboardingLogConstants.MDCs.USER);
-		}		
-	}	
+		}
+	}
 }
